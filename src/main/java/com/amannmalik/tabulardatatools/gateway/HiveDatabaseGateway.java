@@ -9,11 +9,11 @@ import java.sql.SQLException;
 import java.util.List;
 import java.util.stream.Collectors;
 
-public class HiveMetastoreGateway implements MetastoreGateway {
+public class HiveDatabaseGateway implements DatabaseGateway {
 
     private final String connectionString;
 
-    public HiveMetastoreGateway() {
+    public HiveDatabaseGateway() {
 
         String hostname = System.getenv("HIVE_METASTORE_HOSTNAME");
         if(hostname == null) {

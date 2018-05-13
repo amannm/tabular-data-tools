@@ -3,8 +3,8 @@ package com.amannmalik.tabulardatatools;
 import com.amannmalik.tabulardatatools.config.TabularFileReaderConfig;
 import com.amannmalik.tabulardatatools.config.TabularFileWriterConfig;
 import com.amannmalik.tabulardatatools.gateway.AwsStorageGateway;
-import com.amannmalik.tabulardatatools.gateway.HiveMetastoreGateway;
-import com.amannmalik.tabulardatatools.gateway.MetastoreGateway;
+import com.amannmalik.tabulardatatools.gateway.DatabaseGateway;
+import com.amannmalik.tabulardatatools.gateway.HiveDatabaseGateway;
 import com.amannmalik.tabulardatatools.gateway.StorageGateway;
 import com.amannmalik.tabulardatatools.processor.TabularFileProcessor;
 
@@ -17,11 +17,11 @@ import java.util.List;
 public class TabularDataService {
 
     private final StorageGateway storage;
-    private final MetastoreGateway metastore;
+    private final DatabaseGateway database;
 
     public TabularDataService() {
         this.storage = new AwsStorageGateway();
-        this.metastore = new HiveMetastoreGateway();
+        this.database = new HiveDatabaseGateway();
     }
 
     public void createFileFromUpload(URI newFileUri, Path sourceFilePath) {
@@ -36,11 +36,11 @@ public class TabularDataService {
         deleteLocalFile(inputFile);
         storage.put(newTableUri, outputFile);
         deleteLocalFile(outputFile);
-        metastore.register(newTableUri, columnNames);
+        database.register(newTableUri, columnNames);
     }
 
     public void deleteTable(URI tableUri) {
-        metastore.unregister(tableUri);
+        database.unregister(tableUri);
         storage.delete(tableUri);
     }
 
