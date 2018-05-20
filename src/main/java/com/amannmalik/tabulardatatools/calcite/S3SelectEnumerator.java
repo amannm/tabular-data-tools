@@ -5,26 +5,23 @@ import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.s3.AmazonS3URI;
 import com.amazonaws.services.s3.model.*;
 import com.univocity.parsers.csv.CsvFormat;
+import com.univocity.parsers.csv.CsvParser;
 import com.univocity.parsers.csv.CsvParserSettings;
-import org.apache.calcite.linq4j.AbstractEnumerable;
 import org.apache.calcite.linq4j.Enumerator;
 
+import java.io.InputStream;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.util.NoSuchElementException;
 
-public class S3SelectQuery extends AbstractEnumerable<Object[]> {
+public class S3SelectEnumerator implements Enumerator<Object[]> {
 
-    private final URI location;
-    private final String query;
 
-    public S3SelectQuery(URI location, String query) {
-        this.location = location;
-        this.query = query;
-    }
+    private String[] currentLine;
 
-    @Override
-    public Enumerator<Object[]> enumerator() {
-        SelectObjectContentResult result = executeQuery();
-        SelectRecordsInputStream recordsInputStream = result.getPayload().getRecordsInputStream();
+    private final CsvParser csvParser;
+
+    public S3SelectEnumerator(URI location, String query) {
         CsvFormat csvFormat = new CsvFormat();
         csvFormat.setDelimiter(',');
         csvFormat.setLineSeparator("\n");
@@ -33,11 +30,13 @@ public class S3SelectQuery extends AbstractEnumerable<Object[]> {
         CsvParserSettings parserSettings = new CsvParserSettings();
         parserSettings.setHeaderExtractionEnabled(false);
         parserSettings.setFormat(csvFormat);
-        return new S3SelectResultSetEnumerator(recordsInputStream, parserSettings);
+        csvParser = new CsvParser(parserSettings);
+        InputStream inputStream = executeQuery(location, query);
+        csvParser.beginParsing(inputStream, StandardCharsets.UTF_8);
+
     }
 
-
-    private SelectObjectContentResult executeQuery() {
+    private InputStream executeQuery(URI location, String query) {
 
         AmazonS3 s3 = AmazonS3ClientBuilder.defaultClient();
 
@@ -48,7 +47,6 @@ public class S3SelectQuery extends AbstractEnumerable<Object[]> {
         request.setKey(amazonS3URI.getKey());
         request.setExpression(query);
         request.setExpressionType(ExpressionType.SQL);
-
         CSVInput csvInput = new CSVInput();
         InputSerialization inputSerialization = new InputSerialization();
         inputSerialization.setCsv(csvInput);
@@ -64,6 +62,38 @@ public class S3SelectQuery extends AbstractEnumerable<Object[]> {
         outputSerialization.setCsv(csvOutput);
         request.setOutputSerialization(outputSerialization);
 
-        return s3.selectObjectContent(request);
+        SelectObjectContentResult result = s3.selectObjectContent(request);
+        return result.getPayload().getRecordsInputStream();
     }
+
+
+    @Override
+    public Object[] current() {
+        if (currentLine == null) {
+            throw new NoSuchElementException();
+        }
+        return currentLine;
+    }
+
+    @Override
+    public boolean moveNext() {
+        String[] nextLine = csvParser.parseNext();
+        if (nextLine == null) {
+            return false;
+        } else {
+            currentLine = nextLine;
+            return true;
+        }
+    }
+
+    @Override
+    public void reset() {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void close() {
+        csvParser.stopParsing();
+    }
+
 }
