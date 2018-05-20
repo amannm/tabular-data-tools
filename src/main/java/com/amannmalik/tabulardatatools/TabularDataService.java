@@ -36,7 +36,6 @@ public class TabularDataService {
         deleteLocalFile(inputFile);
         storage.put(newTableUri, outputFile);
         deleteLocalFile(outputFile);
-        database.register(newTableUri, columnNames);
     }
 
     public void deleteTable(URI tableUri) {
