@@ -1,7 +1,7 @@
 package com.amannmalik.tabulardatatools;
 
-import com.amannmalik.tabulardatatools.config.TabularFileReaderConfig;
-import com.amannmalik.tabulardatatools.config.TabularFileWriterConfig;
+import com.amannmalik.tabulardatatools.config.FlatFileInputSpecification;
+import com.amannmalik.tabulardatatools.config.FlatFileOutputSpecification;
 import com.amannmalik.tabulardatatools.gateway.AwsStorageGateway;
 import com.amannmalik.tabulardatatools.gateway.DatabaseGateway;
 import com.amannmalik.tabulardatatools.gateway.HiveDatabaseGateway;
@@ -28,7 +28,7 @@ public class TabularDataService {
         storage.put(newFileUri, sourceFilePath);
     }
 
-    public void createTableFromFile(URI newTableUri, URI sourceFileUri, TabularFileReaderConfig config) throws IOException {
+    public void createTableFromFile(URI newTableUri, URI sourceFileUri, FlatFileInputSpecification config) throws IOException {
         Path inputFile = createLocalFile();
         storage.get(sourceFileUri, inputFile);
         Path outputFile = createLocalFile();
@@ -43,7 +43,7 @@ public class TabularDataService {
         storage.delete(tableUri);
     }
 
-    public void createFileFromTable(URI newFileUri, URI sourceTableUri, TabularFileWriterConfig config) throws IOException {
+    public void createFileFromTable(URI newFileUri, URI sourceTableUri, FlatFileOutputSpecification config) throws IOException {
         Path inputFile = createLocalFile();
         storage.get(sourceTableUri, inputFile);
         Path outputFile = createLocalFile();

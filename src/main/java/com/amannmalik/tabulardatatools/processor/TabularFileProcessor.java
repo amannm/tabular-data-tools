@@ -1,24 +1,12 @@
 package com.amannmalik.tabulardatatools.processor;
 
-import com.amannmalik.tabulardatatools.config.TabularFileReaderConfig;
-import com.amannmalik.tabulardatatools.config.TabularFileWriterConfig;
-import com.univocity.parsers.csv.CsvFormat;
-import com.univocity.parsers.csv.CsvParser;
-import com.univocity.parsers.csv.CsvParserSettings;
-import com.univocity.parsers.csv.CsvWriter;
-import com.univocity.parsers.csv.CsvWriterSettings;
+import com.amannmalik.tabulardatatools.config.FlatFileInputSpecification;
+import com.amannmalik.tabulardatatools.config.FlatFileOutputSpecification;
+import com.univocity.parsers.csv.*;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.exec.vector.BytesColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch;
-import org.apache.orc.CompressionCodec;
-import org.apache.orc.CompressionKind;
-import org.apache.orc.OrcFile;
-import org.apache.orc.OrcProto;
-import org.apache.orc.OrcUtils;
-import org.apache.orc.Reader;
-import org.apache.orc.RecordReader;
-import org.apache.orc.TypeDescription;
-import org.apache.orc.Writer;
+import org.apache.orc.*;
 import org.apache.orc.impl.BufferChunk;
 import org.apache.orc.impl.InStream;
 import org.apache.orc.impl.OrcCodecPool;
@@ -93,10 +81,10 @@ public class TabularFileProcessor {
     }
 
 
-    public static List<String> convertCsvToOrc(Path csvInputPath, Path orcOutputPath, TabularFileReaderConfig csvReaderConfig) throws IOException {
+    public static List<String> convertCsvToOrc(Path csvInputPath, Path orcOutputPath, FlatFileInputSpecification csvReaderConfig) throws IOException {
 
         CsvFormat csvFormat = new CsvFormat();
-        csvFormat.setDelimiter(csvReaderConfig.separator);
+        csvFormat.setDelimiter(csvReaderConfig.delimiter);
         csvFormat.setQuote(csvReaderConfig.quoteChar);
         csvFormat.setQuoteEscape(csvReaderConfig.escape);
         CsvParserSettings parserSettings = new CsvParserSettings();
@@ -143,15 +131,15 @@ public class TabularFileProcessor {
         return Arrays.asList(headers);
     }
 
-    public static void convertOrcToCsv(Path orcInputPath, Path csvOutputPath, TabularFileWriterConfig tabularFileWriterConfig) throws IOException {
+    public static void convertOrcToCsv(Path orcInputPath, Path csvOutputPath, FlatFileOutputSpecification flatFileOutputSpecification) throws IOException {
 
         BufferedWriter outputWriter = Files.newBufferedWriter(csvOutputPath, StandardCharsets.UTF_8);
         CsvWriterSettings csvWriterSettings = new CsvWriterSettings();
         CsvFormat csvFormat = new CsvFormat();
-        csvFormat.setQuote(tabularFileWriterConfig.quoteChar);
-        csvFormat.setDelimiter(tabularFileWriterConfig.separator);
-        csvFormat.setLineSeparator(tabularFileWriterConfig.lineEnd);
-        csvFormat.setQuoteEscape(tabularFileWriterConfig.escapeChar);
+        csvFormat.setQuote(flatFileOutputSpecification.quoteChar);
+        csvFormat.setDelimiter(flatFileOutputSpecification.separator);
+        csvFormat.setLineSeparator(flatFileOutputSpecification.lineEnd);
+        csvFormat.setQuoteEscape(flatFileOutputSpecification.escapeChar);
         csvWriterSettings.setFormat(csvFormat);
         CsvWriter csvWriter = new CsvWriter(outputWriter,csvWriterSettings);
 

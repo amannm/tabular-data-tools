@@ -1,5 +1,6 @@
 package com.amannmalik.tabulardatatools.calcite;
 
+import com.amannmalik.tabulardatatools.config.FlatFileTableSpecification;
 import org.apache.calcite.DataContext;
 import org.apache.calcite.linq4j.AbstractEnumerable;
 import org.apache.calcite.linq4j.Enumerable;
@@ -11,26 +12,28 @@ import org.apache.calcite.schema.ProjectableFilterableTable;
 import org.apache.calcite.schema.impl.AbstractTable;
 import org.apache.calcite.sql.type.SqlTypeName;
 
-import java.net.URI;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 public class S3Table extends AbstractTable implements ProjectableFilterableTable {
 
-    private final URI location;
-    private final List<String> fields;
+    private final FlatFileTableSpecification specification;
 
-    public S3Table(URI location, List<String> fields) {
-        this.location = location;
-        this.fields = fields;
+    public S3Table(FlatFileTableSpecification specification) {
+        this.specification = specification;
     }
 
     @Override
     public RelDataType getRowType(RelDataTypeFactory typeFactory) {
         RelDataType sqlType = typeFactory.createSqlType(SqlTypeName.VARCHAR);
-        List<RelDataType> types = fields.stream().map(f -> sqlType).collect(Collectors.toList());
-        return typeFactory.createStructType(types, fields);
+        List<String> fieldNames = specification.structure.columns.stream()
+                .map(c -> c.label)
+                .collect(Collectors.toList());
+        List<RelDataType> types = specification.structure.columns.stream()
+                .map(f -> sqlType)
+                .collect(Collectors.toList());
+        return typeFactory.createStructType(types, fieldNames);
     }
 
     @Override
@@ -43,7 +46,7 @@ public class S3Table extends AbstractTable implements ProjectableFilterableTable
         return new AbstractEnumerable<>() {
             @Override
             public Enumerator<Object[]> enumerator() {
-                return new S3SelectEnumerator(location, String.format("SELECT %s FROM S3Object", selectList));
+                return new S3SelectEnumerator(specification.location, specification.format, String.format("SELECT %s FROM S3Object", selectList));
             }
         };
     }

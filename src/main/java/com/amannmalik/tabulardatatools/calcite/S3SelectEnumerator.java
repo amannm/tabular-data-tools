@@ -1,5 +1,6 @@
 package com.amannmalik.tabulardatatools.calcite;
 
+import com.amannmalik.tabulardatatools.config.FlatFileInputSpecification;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.s3.AmazonS3URI;
@@ -16,27 +17,29 @@ import java.util.NoSuchElementException;
 
 public class S3SelectEnumerator implements Enumerator<Object[]> {
 
-
     private String[] currentLine;
 
     private final CsvParser csvParser;
 
-    public S3SelectEnumerator(URI location, String query) {
-        CsvFormat csvFormat = new CsvFormat();
-        csvFormat.setDelimiter(',');
-        csvFormat.setLineSeparator("\n");
-        csvFormat.setQuote('\"');
-        csvFormat.setQuoteEscape('\\');
-        CsvParserSettings parserSettings = new CsvParserSettings();
-        parserSettings.setHeaderExtractionEnabled(false);
-        parserSettings.setFormat(csvFormat);
-        csvParser = new CsvParser(parserSettings);
-        InputStream inputStream = executeQuery(location, query);
-        csvParser.beginParsing(inputStream, StandardCharsets.UTF_8);
-
+    private static final CsvFormat INTERNAL_SERIALIZATION_FORMAT;
+    static {
+        INTERNAL_SERIALIZATION_FORMAT = new CsvFormat();
+        INTERNAL_SERIALIZATION_FORMAT.setDelimiter(',');
+        INTERNAL_SERIALIZATION_FORMAT.setLineSeparator("\n");
+        INTERNAL_SERIALIZATION_FORMAT.setQuote('\"');
+        INTERNAL_SERIALIZATION_FORMAT.setQuoteEscape('\\');
     }
 
-    private InputStream executeQuery(URI location, String query) {
+    public S3SelectEnumerator(URI location, FlatFileInputSpecification inputSpecification, String query) {
+        CsvParserSettings parserSettings = new CsvParserSettings();
+        parserSettings.setFormat(INTERNAL_SERIALIZATION_FORMAT);
+        parserSettings.setHeaderExtractionEnabled(false);
+        csvParser = new CsvParser(parserSettings);
+        InputStream inputStream = executeQuery(location, inputSpecification, query);
+        csvParser.beginParsing(inputStream, StandardCharsets.UTF_8);
+    }
+
+    private InputStream executeQuery(URI location, FlatFileInputSpecification inputSpecification, String query) {
 
         AmazonS3 s3 = AmazonS3ClientBuilder.defaultClient();
 
@@ -47,19 +50,37 @@ public class S3SelectEnumerator implements Enumerator<Object[]> {
         request.setKey(amazonS3URI.getKey());
         request.setExpression(query);
         request.setExpressionType(ExpressionType.SQL);
+
         CSVInput csvInput = new CSVInput();
+        csvInput.setFileHeaderInfo(inputSpecification.header ? FileHeaderInfo.USE : FileHeaderInfo.NONE);
+        csvInput.setFieldDelimiter(inputSpecification.delimiter);
+        csvInput.setQuoteCharacter(inputSpecification.quoteChar);
+        csvInput.setQuoteEscapeCharacter(inputSpecification.escape);
+        csvInput.setRecordDelimiter(inputSpecification.lineSeparator);
+        csvInput.setComments(inputSpecification.commentChar);
+
         InputSerialization inputSerialization = new InputSerialization();
         inputSerialization.setCsv(csvInput);
-        inputSerialization.setCompressionType(CompressionType.NONE);
+        switch(inputSpecification.compression) {
+            case GZIP:
+                inputSerialization.setCompressionType(CompressionType.GZIP);
+                break;
+            case NONE:
+            default:
+                inputSerialization.setCompressionType(CompressionType.NONE);
+        }
+
         request.setInputSerialization(inputSerialization);
 
         CSVOutput csvOutput = new CSVOutput();
-        csvOutput.setFieldDelimiter(',');
-        csvOutput.setRecordDelimiter('\n');
-        csvOutput.setQuoteCharacter('\"');
-        csvOutput.setQuoteEscapeCharacter('\\');
+        csvOutput.setFieldDelimiter(INTERNAL_SERIALIZATION_FORMAT.getDelimiter());
+        csvOutput.setRecordDelimiter(INTERNAL_SERIALIZATION_FORMAT.getLineSeparatorString());
+        csvOutput.setQuoteCharacter(INTERNAL_SERIALIZATION_FORMAT.getQuote());
+        csvOutput.setQuoteEscapeCharacter(INTERNAL_SERIALIZATION_FORMAT.getQuoteEscape());
+
         OutputSerialization outputSerialization = new OutputSerialization();
         outputSerialization.setCsv(csvOutput);
+
         request.setOutputSerialization(outputSerialization);
 
         SelectObjectContentResult result = s3.selectObjectContent(request);

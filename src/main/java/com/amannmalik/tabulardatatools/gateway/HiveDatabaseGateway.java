@@ -1,13 +1,9 @@
 package com.amannmalik.tabulardatatools.gateway;
 
-import com.amannmalik.tabulardatatools.config.ColumnDefinition;
+import com.amannmalik.tabulardatatools.config.ColumnSpecification;
 
 import java.net.URI;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.PreparedStatement;
-import java.sql.ResultSetMetaData;
-import java.sql.SQLException;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -50,12 +46,12 @@ public class HiveDatabaseGateway implements DatabaseGateway {
         }
     }
 
-    public void register(URI uri, List<ColumnDefinition> columnDefinitions) {
+    public void register(URI uri, List<ColumnSpecification> columnSpecifications) {
 
         String dropStatement = generateDropStatement(uri.toString());
         String createStatement = String.format("CREATE EXTERNAL TABLE `%s` (%s) STORED AS ORC LOCATION '%s'",
                 uri,
-                columnDefinitions.stream().map(cd -> String.format("`%s` %s", cd.label, cd.datatype)).collect(Collectors.joining(",")),
+                columnSpecifications.stream().map(cd -> String.format("`%s` %s", cd.label, cd.datatype)).collect(Collectors.joining(",")),
                 uri);
 
         try (Connection conn = openConnection()) {
@@ -73,9 +69,9 @@ public class HiveDatabaseGateway implements DatabaseGateway {
 
         String selectStatement = injectScriptReferences(inputReferenceMap, script);
 
-        List<ColumnDefinition> columnDefinitions = determineOutputSchema(selectStatement);
+        List<ColumnSpecification> columnSpecifications = determineOutputSchema(selectStatement);
 
-        register(uri, columnDefinitions);
+        register(uri, columnSpecifications);
 
         String insertStatement = reprocessScript(uri, selectStatement);
 
@@ -98,15 +94,15 @@ public class HiveDatabaseGateway implements DatabaseGateway {
         }
     }
 
-    private List<ColumnDefinition> determineOutputSchema(String script) {
-        List<ColumnDefinition> columnDefinitions;
+    private List<ColumnSpecification> determineOutputSchema(String script) {
+        List<ColumnSpecification> columnSpecifications;
         try (Connection connection = openConnection()) {
             ResultSetMetaData metaData;
             try (PreparedStatement stmt = connection.prepareStatement(script)) {
                 metaData = stmt.getMetaData();
             }
             int columnCount = metaData.getColumnCount();
-            columnDefinitions = new ArrayList<>(columnCount);
+            columnSpecifications = new ArrayList<>(columnCount);
             for (int i = 1; i <= columnCount; i++) {
                 String columnLabel = metaData.getColumnLabel(i);
                 String columnTypeName = metaData.getColumnTypeName(i);
@@ -123,12 +119,12 @@ public class HiveDatabaseGateway implements DatabaseGateway {
                 //TODO: assess necessity
                 //metaData.getPrecision(i);
                 //metaData.getScale(i);
-                columnDefinitions.add(new ColumnDefinition(columnLabel, columnTypeName));
+                columnSpecifications.add(new ColumnSpecification(columnLabel, columnTypeName));
             }
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
-        return columnDefinitions;
+        return columnSpecifications;
     }
 
     private String injectScriptReferences(Map<String, URI> inputReferenceMap, String script) {
